@@ -221,6 +221,3 @@ if __name__ == "__main__":
 	core, U = CPTF(X, Xtest, dims, rank, reg, reg_S, t)
 	# test_err = RMSE(Xtest, core, U) 
 	# print ("[CPTF] Final RMSE = {}".format(test_err))
-
-	
-# 140.112.187.116
