@@ -1,6 +1,6 @@
 # Tensor-Factorization
-=============================================
-This is an implement of n-dimensional tensor factorization on Python.
+
+This is an implement of n-dimensional tensor factorization using SGD and ALS to minimize square error.
 
 ## Input Format
 Each line presents one rating information. The last element is rating value and the rest are features. 
