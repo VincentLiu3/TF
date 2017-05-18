@@ -1,5 +1,4 @@
 # Tensor-Factorization
-N-dimensional Tensor Factorization for Recommender Systems
 =============================================
 This is an implement of n-dimensional tensor factorization on Python.
 
