@@ -1,8 +1,7 @@
-import pandas as pd
+import numpy as np
 
 def read_data(file_name):
-	X = pd.read_csv(file_name, sep=',', header=None)
-	X = X.as_matrix()
+	X = numpy.loadtxt(file_name, delimiter = ',')
 	ndims = X.shape[1]-1
 	dims = [X.T[i].max()+1 for i in range(ndims)]
 	return X, dims
