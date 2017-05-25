@@ -1,11 +1,13 @@
-# Tensor-Factorization
+# Tensor Factorization
 
-This is an implement of n-dimensional tensor factorization using SGD and ALS to minimize square error.
+This is an implementation of n-dimensional tensor factorization using SGD and ALS to minimize square loss. 
 
 ## Input Format
-Each line presents one rating information. The last element is rating value and the rest are features. 
-For example, the data below has two ratings (2 and 4), and each ratings have three features. 
+Each line presents one rating data and each column presents one rating feature.
+The last column is rating value and the rest are features. 
+For example, the data below has two data (rating = 2 and 4), and each ratings have three features. 
 ```
+X1,X2,X3,Y
 0,3,1,2
 1,2,2,4
 ```
