@@ -17,7 +17,7 @@ def parse_args():
 	parser.add_argument('--lr', type = int, default = 1000000, help = 'Initial learning rate for latent facotrs')
 	parser.add_argument('--lrS', type = int, default = 1000000, help = 'Initial learning rate for core tensor')
 	
-	parser.add_argument('--batchRatio', type = float, default = 0.5, help = 'Training instances for each iteration')
+	parser.add_argument('--batchRatio', type = float, default = 0.1, help = 'Training instances for each iteration')
 	parser.add_argument('--maxEpo', type = int, default = 2, help = 'Max training epo')
 	parser.add_argument('--verbose', type = int, default = 1, help = 'Verbose or not')
 	return parser.parse_args()
