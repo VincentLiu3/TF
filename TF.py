@@ -11,7 +11,7 @@ def parse_args():
 	parser.add_argument('--test' , type = str, default = '', help = 'Testing file')
 	parser.add_argument('--out' , type = str, default = '', help = 'File where the final result will be saved')
 
-	parser.add_argument('--k', type = str, default = '10', help = 'Dimension of latent fectors, e.g. \'10-10-10\'')
+	parser.add_argument('--k', type = str, default = '8', help = 'Dimension of latent fectors, e.g. \'10-10-10\'')
 	parser.add_argument('--reg', type = float, default = 0.1, help = 'Regularization for latent facotrs')
 	parser.add_argument('--regS', type = float, default = 0.1, help = 'Regularization for core tensor')
 	parser.add_argument('--lr', type = float, default = 0.1, help = 'Initial learning rate for latent facotrs')
@@ -62,7 +62,7 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 			t_S += 1
 
 			ind = X[i][0:ndims]
-			val = X[i][ndims] # trn_y[i]
+			val = X[i][ndims] # = trn_y[i]
 
 			# Compute F_ijk and f - y
 			Ui_list = [U[k][ind[k]] for k in range(ndims)]
@@ -86,12 +86,7 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 				# Evaluation
 				trn_loss = training_loss(trn_loss, batch_size, core, U, reg, reg_S)
 				change_rate = (trn_loss - pre_loss) / pre_loss * 100
-				pre_loss = trn_loss
-
-				if np.isnan(trn_loss):
-					iter_count = max_iter
-					break
-
+				
 				## Testing Loss
 				tst_pred_y = pred(Xtest, core, U)
 				tst_loss = testing_loss(tst_y, tst_pred_y, core, U, reg, reg_S)
@@ -105,11 +100,19 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 				print('[TF] Testing Loss = {:.2f}. RMSE = {:.4f}'.format(tst_loss, test_rmse))
 				tic = time.time()
 
+				'''
 				if change_rate < tol and pre_loss > 0:
 					print("[TF] Early Stoping due to insufficient change in training loss!")
 					iter_count = max_iter
 					break
+				'''
+				
+				if np.isnan(trn_loss): # numpy overflow
+					print("[TF] Overflow")
+					iter_count = max_iter
+					break
 
+				pre_loss = trn_loss
 				trn_loss = 0 # starts from 0
 
 	return core, U
@@ -142,7 +145,7 @@ def training_loss(loss, num, core, U, reg, reg_S):
 	U_l2 = [np.linalg.norm(Ui.flat) for Ui in U]
 	core_l1 = np.linalg.norm(core.flat, ord = 1)
 	core_l2 = np.linalg.norm(core.flat)
-	return( loss / num + reg * sum(U_l2) + reg_S * core_l2 )
+	return( loss / num + reg / 2 * sum(U_l2) + reg_S / 2 * core_l2 )
 
 def testing_loss(X, Y, core, U, reg, reg_S):
 	'''
@@ -150,12 +153,12 @@ def testing_loss(X, Y, core, U, reg, reg_S):
 	Y: predicted value (np array or list)
 	return: objective loss
 	'''
-	assert( len(X)==len(Y) ), "ObjLoss: two different size arrays."
+	assert( len(X)==len(Y) ), "Loss Funtion: two different size arrays."
 	U_l2 = [np.linalg.norm(Ui.flat) for Ui in U]
 	core_l1 = np.linalg.norm(core.flat, ord = 1)
 	core_l2 = np.linalg.norm(core.flat)
-	return( sum( pow(X-Y, 2) ) / len(X) + reg * sum(U_l2) + reg_S * core_l2 )
-
+	return( sum( pow(X-Y, 2) ) / len(X) + reg / 2 * sum(U_l2) + reg_S / 2 * core_l2 )
+ 
 def RMSE(X, Y):
 	'''
 	X, Y = np.array or list
