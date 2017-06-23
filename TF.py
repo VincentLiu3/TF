@@ -11,19 +11,21 @@ def parse_args():
 	parser.add_argument('--test' , type = str, default = '', help = 'Testing file')
 	parser.add_argument('--out' , type = str, default = '', help = 'File where the final result will be saved')
 
-	parser.add_argument('--k', type = str, default = '8', help = 'Dimension of latent fectors, e.g. \'10-10-10\'')
+	parser.add_argument('--k', type = str, default = '8', help = 'Dimension of latent fectors, e.g. \'8-8-8\'')
 	parser.add_argument('--reg', type = float, default = 0.1, help = 'Regularization for latent facotrs')
 	parser.add_argument('--regS', type = float, default = 0.1, help = 'Regularization for core tensor')
 	parser.add_argument('--lr', type = float, default = 0.1, help = 'Initial learning rate for latent facotrs')
 	parser.add_argument('--lrS', type = float, default = 0.1, help = 'Initial learning rate for core tensor')
 	
-	parser.add_argument('--batchRatio', type = float, default = 0.1	, help = 'Training instances for each iteration')
+	parser.add_argument('--batchRatio', type = float, default = 0.1, help = 'Training instances for each iteration')
 	parser.add_argument('--maxEpo', type = int, default = 10, help = 'Max training epo')
 	parser.add_argument('--verbose', type = int, default = 1, help = 'Verbose or not')
 	return parser.parse_args()
 
 def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbose, tol=0):
 	'''
+	Tucker decomposition with ALS and SGD
+	-----------------------------------
 	X, Xtest = n-dimension tensor presented in 2-dimension matrix 
 	dims, rank = used to init core and U
 	rank = # of factors for each feature
@@ -42,17 +44,16 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 	pre_loss = -1
 	trn_loss = 0
 
-	trn_y = X.T[ndims]
-	tst_y = Xtest.T[ndims]
+	trn_y = X.T[ndims] # rating values of training data
+	tst_y = Xtest.T[ndims] # rating values of testing data
 
 	# initialze core and U
 	core, U = init_factors(rank, dims)
 	
 	tic = time.time()
 	while iter_count < max_iter:
-		for i in np.random.permutation(ninstance):
+		for i in np.random.permutation(ninstance): # pick on instance in X randomly
 		# for i in np.random.choice(range(ninstance), batch_size, replace = False):
-			# pick on instance in X randomly
 			iter_count += 1
 			
 			# Compute learn rate
@@ -83,7 +84,7 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 			core -= step_S
 
 			if iter_count%batch_size == 0:
-				# Evaluation
+				# Training Loss
 				trn_loss = training_loss(trn_loss, batch_size, core, U, reg, reg_S)
 				change_rate = (trn_loss - pre_loss) / pre_loss * 100
 				
@@ -91,8 +92,6 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 				tst_pred_y = pred(Xtest, core, U)
 				tst_loss = testing_loss(tst_y, tst_pred_y, core, U, reg, reg_S)
 				test_rmse = RMSE(tst_y, tst_pred_y)
-				# change_rate = (pre_loss - tst_loss) / pre_loss * 100
-				# pre_loss = tst_loss
 				
 				toc = time.time()
 				print("[TF] Iter {}/{}. Time: {:.1f}".format(iter_count, max_iter, toc - tic))
@@ -107,7 +106,7 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 					break
 				'''
 				
-				if np.isnan(trn_loss): # numpy overflow
+				if np.isnan(trn_loss): # numpy overflow, need to use less learning rate
 					print("[TF] Overflow")
 					iter_count = max_iter
 					break
@@ -145,7 +144,7 @@ def training_loss(loss, num, core, U, reg, reg_S):
 	U_l2 = [np.linalg.norm(Ui.flat) for Ui in U]
 	core_l1 = np.linalg.norm(core.flat, ord = 1)
 	core_l2 = np.linalg.norm(core.flat)
-	return( loss / num + reg / 2 * sum(U_l2) + reg_S / 2 * core_l2 )
+	return( loss / core_l1 + reg / 2 * sum(U_l2) + reg_S / 2 * core_l2 )
 
 def testing_loss(X, Y, core, U, reg, reg_S):
 	'''
@@ -153,11 +152,11 @@ def testing_loss(X, Y, core, U, reg, reg_S):
 	Y: predicted value (np array or list)
 	return: objective loss
 	'''
-	assert( len(X)==len(Y) ), "Loss Funtion: two different size arrays."
+	assert( len(X)==len(Y) ), "Loss: Two different size arrays."
 	U_l2 = [np.linalg.norm(Ui.flat) for Ui in U]
 	core_l1 = np.linalg.norm(core.flat, ord = 1)
 	core_l2 = np.linalg.norm(core.flat)
-	return( sum( pow(X-Y, 2) ) / len(X) + reg / 2 * sum(U_l2) + reg_S / 2 * core_l2 )
+	return( sum( pow(X-Y, 2) ) / core_l1 + reg / 2 * sum(U_l2) + reg_S / 2 * core_l2 )
  
 def RMSE(X, Y):
 	'''
@@ -175,10 +174,11 @@ def MAE(X, Y):
 
 def pred(X, core, U):
 	'''
-	X = orign value (np array or list)
-	core = sparse tensor
-	U = list of matrix
-	return prediction  
+	X = test data (sparse matrix)
+	core = core tensor (dense tensor)
+	U = list of latent factors for each mode
+	--------------------
+	return prediction (list)
 	'''
 	ninstance = X.shape[0]
 	ndims = X.shape[1]-1
@@ -197,7 +197,7 @@ def init_factors(rank, dims):
 	'''
 	Initialize tensor and matrix with small random values
 	'''
-	assert(len(rank) == len(dims)), "Rank must be the same length as data dimensions."
+	assert(len(rank) == len(dims)), "Rank must be the same length as number of features."
 	# Core = np.random.rand(multiply_list(rank)).reshape(rank) / multiply_list(rank)
 	Core = np.random.rand(multiply_list(rank)).reshape(rank)
 	U = [np.random.rand(dims[i], rank[i])/rank[i] for i in range(len(dims))]
@@ -214,6 +214,7 @@ if __name__ == "__main__":
 		start_time = time.time()
 		print('----------------- TF -----------------')
 		print("[Data] Number of types for each feature = {}".format(dims))
+		print("[Data] Training Size = {}. Testing Size = {}".format(X.shape[0], Xtest.shape[0]))
 		print("[Settings] K = {}. reg = {}. regS = {}. lr = {}. lrS = {}".format(rank, args.reg, args.regS, args.lr, args.lrS))
 
 	# Training

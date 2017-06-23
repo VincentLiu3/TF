@@ -28,7 +28,7 @@ def save_result(args, rmse):
 	if args.out != '':
 		if os.path.exists(args.out) == True:
 			with open(args.out, 'a') as fp_w:
-				fp_w.write('{},{},{},{},{},{},{:.4f}\n'.format(args.k, args.reg, args.regS, args.lr, args.batchRatio, args.maxEpo, rmse))
+				fp_w.write('{},{},{},{},{},{},{},{:.4f}\n'.format(args.k, args.reg, args.regS, args.lr, args.lrS, args.batchRatio, args.maxEpo, rmse))
 		else:
 			with open(args.out, 'w') as fp_w:
 				fp_w.write('k,reg,regS,lr,lrS,batchRatio,maxEpo,RMSE\n')
