@@ -1,5 +1,6 @@
 import argparse
 import sktensor
+import logging
 import time
 import numpy as np
 from functools import reduce
@@ -17,53 +18,54 @@ def parse_args():
 	parser.add_argument('--lr', type = float, default = 0.1, help = 'Initial learning rate for latent facotrs')
 	parser.add_argument('--lrS', type = float, default = 0.1, help = 'Initial learning rate for core tensor')
 	
-	parser.add_argument('--batchRatio', type = float, default = 0.1, help = 'Training instances for each iteration')
 	parser.add_argument('--maxEpo', type = int, default = 10, help = 'Max training epo')
 	parser.add_argument('--verbose', type = int, default = 1, help = 'Verbose or not')
 	return parser.parse_args()
 
-def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbose, tol=0):
+def TPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, max_iter, tol=0):
 	'''
 	Tucker decomposition with ALS and SGD
 	-----------------------------------
-	X, Xtest = n-dimension tensor presented in 2-dimension matrix 
+	X, Xtest = n-dimension tensor presented in [2D matrix, 1D array]
 	dims, rank = used to init core and U
 	rank = # of factors for each feature
 	'''
-	assert(X.ndim == 2 and Xtest.ndim == 2), "CPTF: X must be a 2D matrix."
+	assert(len(X) == 2 and len(Xtest) == 2), "TPTF: no rating values."
+	assert(X[0].ndim == 2 and Xtest[0].ndim == 2), "TPTF: X must be a 2D matrix."
+	assert(X[0].shape[0] == len(X[1]) and Xtest[0].shape[0] == len(Xtest[1])), "TPTF: rating and index must have the same length."
 	
 	t = int( pow( 1/lr, 2) )
 	t_S = int( pow( 1/lrS, 2) )
+ 
+	trn_x = X[0] # index of training data
+	tst_x = Xtest[0] # index of testing data
 
-	ninstance = X.shape[0]
-	ndims = X.shape[1]-1
+	trn_y = X[1] # rating values of training data
+	tst_y = Xtest[1] # rating values of testing data
+
+	ninstance = trn_x.shape[0]
+	ndims = trn_x.shape[1]
 	
-	batch_size = int(ninstance * batch_ratio)
-	max_iter = int(max_epo * ninstance)
 	iter_count = 0
 	pre_loss = -1
-	trn_loss = 0
-
-	trn_y = X.T[ndims] # rating values of training data
-	tst_y = Xtest.T[ndims] # rating values of testing data
 
 	# initialze core and U
 	core, U = init_factors(rank, dims)
 	
 	tic = time.time()
 	while iter_count < max_iter:
+		iter_count += 1
+		trn_loss = 0
+		# Training 
 		for i in np.random.permutation(ninstance): # pick on instance in X randomly
-		# for i in np.random.choice(range(ninstance), batch_size, replace = False):
-			iter_count += 1
-			
 			# Compute learn rate
 			lr = 1 / np.sqrt(t)
 			lrS = 1 / np.sqrt(t_S)
 			t += 1
 			t_S += 1
 
-			ind = X[i][0:ndims]
-			val = X[i][ndims] # = trn_y[i]
+			ind = trn_x[i]
+			val = trn_y[i]
 
 			# Compute F_ijk and f - y
 			Ui_list = [U[k][ind[k]] for k in range(ndims)]
@@ -83,37 +85,34 @@ def CPTF(X, Xtest, dims, rank, reg, reg_S, lr, lrS, batch_ratio, max_epo, verbos
 			step_S += lrS * e_ijk * reduce(np.multiply.outer, Ui_list)
 			core -= step_S
 
-			if iter_count%batch_size == 0:
-				# Training Loss
-				trn_loss = training_loss(trn_loss, batch_size, core, U, reg, reg_S)
-				change_rate = (trn_loss - pre_loss) / pre_loss * 100
-				
-				## Testing Loss
-				tst_pred_y = pred(Xtest, core, U)
-				tst_loss = testing_loss(tst_y, tst_pred_y, core, U, reg, reg_S)
-				test_rmse = RMSE(tst_y, tst_pred_y)
-				
-				toc = time.time()
-				print("[TF] Iter {}/{}. Time: {:.1f}".format(iter_count, max_iter, toc - tic))
-				print('[TF] Training Loss = {:.2f} (change {:.2f}%)'.format(trn_loss, change_rate))
-				print('[TF] Testing Loss = {:.2f}. RMSE = {:.4f}'.format(tst_loss, test_rmse))
-				tic = time.time()
+		# Training Loss
+		trn_loss = training_loss(trn_loss, core, U, reg, reg_S)
+		change_rate = (trn_loss - pre_loss) / pre_loss * 100
+		
+		## Testing Loss
+		tst_pred_y = pred(Xtest[0], core, U)
+		test_rmse = RMSE(tst_y, tst_pred_y)
+		# tst_loss = testing_loss(tst_y, tst_pred_y, core, U, reg, reg_S)
+		
+		toc = time.time()
+		logger.info('Iter {}/{}. Time: {:.1f}'.format(iter_count, max_iter, toc - tic))
+		logger.info('Training Loss: {:.2f} (change {:.2f}%). Testing RMSE: {:.4f}'.format(trn_loss, change_rate, test_rmse))
+		tic = time.time()
 
-				'''
-				if change_rate < tol and pre_loss > 0:
-					print("[TF] Early Stoping due to insufficient change in training loss!")
-					iter_count = max_iter
-					break
-				'''
-				
-				if np.isnan(trn_loss): # numpy overflow, need to use less learning rate
-					print("[TF] Overflow")
-					iter_count = max_iter
-					break
+		''' Early Stopping
+		if change_rate < tol and pre_loss > 0:
+			print("[TF] Early Stoping due to insufficient change in training loss!")
+			iter_count = max_iter
+			break
+		'''
+		
+		if np.isnan(trn_loss): # numpy overflow, need to use less learning rate
+			logger.info('TF: Overflow')
+			iter_count = max_iter
+			break
 
-				pre_loss = trn_loss
-				trn_loss = 0 # starts from 0
-
+		pre_loss = trn_loss
+		
 	return core, U
 
 def tensor_ttv(core, Ui_list, remove_k=None):
@@ -127,20 +126,19 @@ def tensor_ttv(core, Ui_list, remove_k=None):
 	'''
 	dt_core = sktensor.dtensor(core)
 	assert( dt_core.ndim == len(Ui_list) ), "tensor_ttv: core and U must be tha same dimension."
-
-	modes = ()
-	for k in range(dt_core.ndim):
-		if k is not remove_k:
-			modes += (k,)
-
+	#
+	modes = range(len(Ui_list))
+	if remove_k is not None:
+		modes.remove(remove_k)
+	#
 	out_core = dt_core.ttv(tuple(Ui_list), modes)
-
+	#
 	if len(out_core) == 1: # out_core is a scaler
 		return( out_core[0] )
 	else:
 		return( np.array(out_core) )
 
-def training_loss(loss, num, core, U, reg, reg_S):
+def training_loss(loss, core, U, reg, reg_S):
 	U_l2 = [np.linalg.norm(Ui.flat) for Ui in U]
 	core_l1 = np.linalg.norm(core.flat, ord = 1)
 	core_l2 = np.linalg.norm(core.flat)
@@ -172,25 +170,24 @@ def MAE(X, Y):
 	assert( len(X)==len(Y) ), "MAE: Two arrays must be the same size."
 	return( sum( abs(X-Y) ) / len(X) )
 
-def pred(X, core, U):
+def pred(ind_X, core, U):
 	'''
-	X = test data (sparse matrix)
+	X = index of test data (sparse matrix)
 	core = core tensor (dense tensor)
 	U = list of latent factors for each mode
 	--------------------
 	return prediction (list)
 	'''
-	ninstance = X.shape[0]
-	ndims = X.shape[1]-1
-
+	ninstance = ind_X.shape[0]
+	ndims = ind_X.shape[1]
+	#
 	prediction = []
 	for i in range(ninstance): # Complexity: O( ninstance * k^k )
-		ind = X[i][0:ndims]
-
+		ind = ind_X[i]
 		Ui_list = [U[k][ind[k]] for k in range(ndims)]
 		pred_Y = tensor_ttv(core, Ui_list)
 		prediction.append(pred_Y)
-		
+	#
 	return( prediction )
 
 def init_factors(rank, dims):
@@ -198,36 +195,37 @@ def init_factors(rank, dims):
 	Initialize tensor and matrix with small random values
 	'''
 	assert(len(rank) == len(dims)), "Rank must be the same length as number of features."
-	# Core = np.random.rand(multiply_list(rank)).reshape(rank) / multiply_list(rank)
-	Core = np.random.rand(multiply_list(rank)).reshape(rank)
+	Core = np.random.rand(multiply_list(rank)).reshape(rank) # / multiply_list(rank)
 	U = [np.random.rand(dims[i], rank[i])/rank[i] for i in range(len(dims))]
 	return Core, U
 
 if __name__ == "__main__":
 	args = parse_args()
-	X, tst_dims = read_data(args.train)
-	Xtest, trn_dims = read_data(args.test)
+	X, trn_dims = read_data(args.train)
+	Xtest, tst_dims = read_data(args.test)
 	dims = integrate_dims(tst_dims, trn_dims)
 	rank = string2list(args.k, len(dims))
 
 	if(args.verbose == 1):
-		start_time = time.time()
-		print('----------------- TF -----------------')
-		print("[Data] Number of types for each feature = {}".format(dims))
-		print("[Data] Training Size = {}. Testing Size = {}".format(X.shape[0], Xtest.shape[0]))
-		print("[Settings] K = {}. reg = {}. regS = {}. lr = {}. lrS = {}".format(rank, args.reg, args.regS, args.lr, args.lrS))
+		logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+	else:
+		logging.basicConfig(level=logging.WARNING, format='[%(levelname)s] %(message)s')
+	
+	start_time = time.time()
+	logger = logging.getLogger()
+	logger.info('----------------- TF -----------------')
+	logger.info('Data: Number of types for each feature = {}'.format(dims))
+	logger.info('Data: Training Size = {}. Testing Size = {}'.format(len(X[1]), len(Xtest[1])))
+	logger.info('Settings: K = {}. reg = {}. regS = {}. lr = {}. lrS = {}'	.format(rank, args.reg, args.regS, args.lr, args.lrS))
 
 	# Training
-	core, U = CPTF(X, Xtest, dims, rank, args.reg, args.regS, args.lr, args.lrS, args.batchRatio, args.maxEpo, args.verbose)
+	core, U = TPTF(X, Xtest, dims, rank, args.reg, args.regS, args.lr, args.lrS, args.maxEpo)
 	
 	# Evaluation
-	pred = pred(Xtest, core, U)
-	orin = Xtest.T[Xtest.shape[1]-1]
-	rmse = RMSE(orin, pred)
+	pred = pred(Xtest[0], core, U)
+	rmse = RMSE(Xtest[1], pred)
 	save_result(args, rmse)
 
-	if(args.verbose == 1):
-		end_time = time.time()
-		print('[Result] RMSE = {:.4f}'.format(rmse))
-		print("[Result] Total Time = {:.1f}s".format(end_time - start_time))
-	
+	end_time = time.time()
+	logger.info('RMSE: {:.4f}'.format(rmse))
+	logger.info('Total Time: {:.1f}s'.format(end_time - start_time))

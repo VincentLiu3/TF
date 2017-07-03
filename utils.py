@@ -2,10 +2,16 @@ import numpy as np
 import os.path
 
 def read_data(file_name):
-	X = np.loadtxt(file_name, dtype = int, delimiter = ',')
+	'''
+	X: index 
+	Y: rating values
+	'''
+	X = np.loadtxt(file_name, dtype=float, delimiter=',')
 	ndims = X.shape[1]-1
+	Y = X.T[ndims] # rating values
+	X = np.delete(X, ndims, 1).astype(int) # index values
 	dims = [X.T[i].max()+1 for i in range(ndims)]
-	return X, dims
+	return [X, Y], dims
 
 def multiply_list(lst):
 	product = 1
@@ -26,14 +32,13 @@ def save_result(args, rmse):
 	save rmse to args.out
 	'''
 	if args.out != '':
-		if os.path.exists(args.out) == True:
-			with open(args.out, 'a') as fp_w:
-				fp_w.write('{},{},{},{},{},{},{},{:.4f}\n'.format(args.k, args.reg, args.regS, args.lr, args.lrS, args.batchRatio, args.maxEpo, rmse))
-		else:
-			with open(args.out, 'w') as fp_w:
-				fp_w.write('k,reg,regS,lr,lrS,batchRatio,maxEpo,RMSE\n')
-				fp_w.write('{},{},{},{},{},{},{},{:.4f}\n'.format(args.k, args.reg, args.regS, args.lr, args.lrS, args.batchRatio, args.maxEpo, rmse))
+		if os.path.exists(args.out) is False:
+			with open(args.out, 'w') as fp: # create the file and write header
+				fp.write('k,reg,regS,lr,lrS,maxEpo,RMSE\n')
 
+		with open(args.out, 'a') as fp:
+			fp.write('{},{},{},{},{},{},{:.4f}\n'.format(args.k, args.reg, args.regS, args.lr, args.lrS, args.maxEpo, rmse))
+		
 def string2list(k, ndims):
 	k_list = k.split('-')
 	last_k = int(k_list[len(k_list)-1])
