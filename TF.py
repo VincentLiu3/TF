@@ -10,6 +10,8 @@ def parse_args():
 	parser = argparse.ArgumentParser(description = 'Tensor Factorization')
 	parser.add_argument('--train' , type = str, default = '', help = 'Training file')
 	parser.add_argument('--test' , type = str, default = '', help = 'Testing file')
+
+	parser.add_argument('--model' , type = str, default = '', help = 'Directory where the final model will be saved')
 	parser.add_argument('--out' , type = str, default = '', help = 'File where the final result will be saved')
 
 	parser.add_argument('--k', type = str, default = '8', help = 'Dimension of latent fectors, e.g. \'8-8-8\'')
@@ -17,8 +19,8 @@ def parse_args():
 	parser.add_argument('--regS', type = float, default = 0.1, help = 'Regularization for core tensor')
 	parser.add_argument('--lr', type = float, default = 0.1, help = 'Initial learning rate for latent facotrs')
 	parser.add_argument('--lrS', type = float, default = 0.1, help = 'Initial learning rate for core tensor')
-	
 	parser.add_argument('--maxEpo', type = int, default = 10, help = 'Max training epo')
+	
 	parser.add_argument('--verbose', type = int, default = 1, help = 'Verbose or not')
 	return parser.parse_args()
 
@@ -220,7 +222,8 @@ if __name__ == "__main__":
 
 	# Training
 	core, U = TPTF(X, Xtest, dims, rank, args.reg, args.regS, args.lr, args.lrS, args.maxEpo)
-	
+	save_model(args, core, U)
+
 	# Evaluation
 	pred = pred(Xtest[0], core, U)
 	rmse = RMSE(Xtest[1], pred)

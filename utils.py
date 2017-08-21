@@ -1,5 +1,5 @@
 import numpy as np
-import os.path
+import os
 
 def read_data(file_name):
 	'''
@@ -12,6 +12,14 @@ def read_data(file_name):
 	X = np.delete(X, ndims, 1).astype(int) # index values
 	dims = [X.T[i].max()+1 for i in range(ndims)]
 	return [X, Y], dims
+
+def save_model(args, core, U):
+	if args.model != '':
+		if os.path.exists(args.model) is False:
+			os.mkdir(args.model)  # e.g. models/ml-1m
+		our_path = '{}/{}_{}_{}_{}_{}_{}_'.format(args.model, args.k, args.reg, args.regS, args.lr, args.lrS, args.maxEpo)  
+		np.save(our_path+'core.npy', core)
+		np.save(our_path+'U.npy', U)
 
 def multiply_list(lst):
 	product = 1
