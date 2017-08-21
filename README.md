@@ -11,7 +11,7 @@ Feat1,Feat2,Feat3,Rating
 
 ## Quick Start
 ```
-$ python TF.py --train data/ml-1m/item_train.txt --test data/ml-1m/item_test.txt --reg 0.1 --regS 0.1 --lr 0.1 --lr 0.01
+$ python TF.py --train data/ml-1m/user_train.txt --test data/ml-1m/user_test.txt --reg 0.1 --regS 0.1 --lr 0.1 --lr 0.1
 ```
 You can type **python TF.py --help** for more details about the parameters.
 
