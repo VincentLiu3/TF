@@ -11,9 +11,9 @@ Feat1,Feat2,Feat3,Rating
 
 ## Quick Start
 ```
-$ python TF.py --train data/ml-1m/user_train.txt --test data/ml-1m/user_test.txt --reg 0.1 --regS 0.1 --lr 0.1 --lr 0.1
+$ python TF.py --train data/ml-1m/user_train.txt --test data/ml-1m/user_test.txt --reg 0.1 --regS 0.1 --lr 0.001 --lrS 0.001
 ```
-You can type **python TF.py --help** for more details about the parameters.
+You can type **python TF.py --help** for more details about the parameters. It is recommended to start from a small learning rate (especially for lrS).
 
 ## Reference
 ```
